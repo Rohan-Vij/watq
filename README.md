@@ -1,5 +1,8 @@
 # Water Quality IoT
 
+### AWS
+Make an `/auth` folder with the IoT thing's private key (`pem.key`) and device certificate (`pem.crt`).
+
 ### Sensors
 1. DS18x20 Temperature Sensor - [Driver](https://github.com/robert-hh/Onewire_DS18X20)
 2. KS0414 Keyestudio Turbidity Sensor - [Driver](https://wiki.keyestudio.com/KS0414_Keyestudio_Turbidity_Sensor_V1.0)

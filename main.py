@@ -66,6 +66,7 @@ def http_get(url):
 
 # print(http_get("https://api.ipify.org/?format=json"))
 print("Public IP:", json.loads(http_get("https://api.ipify.org/?format=json"))['ip'])
+print()
 
 for i in range(10):
     print(f"Starting sensor reading in {10-i} seconds")

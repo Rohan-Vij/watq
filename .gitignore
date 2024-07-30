@@ -3,6 +3,7 @@
 
 ### CUSTOM
 config.py
+auth/
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
