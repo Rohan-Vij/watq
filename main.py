@@ -5,91 +5,118 @@ import socket
 import json
 from temp_sensor import DS18X20
 from onewire import OneWire
-
 import config
 
-# --- NETWORKING SETUP ---
+class WiFiConnection:
+    def __init__(self, ssid, password):
+        self.ssid = ssid
+        self.password = password
+        self.sta_if = network.WLAN(network.STA_IF)
+        self.ap_if = network.WLAN(network.AP_IF)
 
-wifi_SSID = config.SSID
-wifi_pass = config.PASS
+    def connect(self):
+        print(f"Access point available?: {self.ap_if.active()}")
+        print(f"Station (WiFi connectivity) available?: {self.sta_if.active()}\n")
 
-sta_if = network.WLAN(network.STA_IF)
-ap_if = network.WLAN(network.AP_IF)
+        if not self.sta_if.active():
+            print("Turning on WiFi station connectivity... ", end="")
+            self.sta_if.active(True)
+            print("successfully turned on\n")
 
-print(f"Access point available?: {ap_if.active()}")
-print(f"Station (WiFi connectivity) available?: {sta_if.active()}\n")
+        print("Connecting to WiFi network with:")
+        print("\tSSID:", self.ssid)
 
-if (not sta_if.active()):
-    print("Turning on WiFi station connectivity... ", end="")
-    sta_if.active(True)
-    print("successfully turned on\n")
-
-print("Connecting to WiFi network with:")
-print("\tSSID:", wifi_SSID)
-
-if wifi_pass != "":
-    print("\tPassword:", wifi_pass)
-else:
-    print("\tPassword: passwordless network")
-print()
-
-i = 1
-while not sta_if.isconnected():
-    try:
-        if wifi_pass != "":
-            sta_if.connect(wifi_SSID, wifi_pass)
+        if self.password:
+            print("\tPassword:", self.password)
         else:
-            sta_if.connect(wifi_SSID, "")
-    except OSError as e:
-        print("OSError/Wifi conn error, trying again...")
+            print("\tPassword: passwordless network")
+        print()
 
-    print(f"Connecting to network... (Attempt {i})")
-    time.sleep(3)
-    i += 1
+        i = 1
+        while not self.sta_if.isconnected():
+            try:
+                self.sta_if.connect(self.ssid, self.password)
+            except OSError as e:
+                print("OSError/Wifi connection error, trying again...")
 
-def http_get(url):
-    _, _, host, path = url.split('/', 3)
-    addr = socket.getaddrinfo(host, 80)[0][-1]
-    s = socket.socket()
-    s.connect(addr)
-    s.send(bytes('GET /%s HTTP/1.0\r\nHost: %s\r\n\r\n' % (path, host), 'utf8'))
+            print(f"Connecting to network... (Attempt {i})")
+            time.sleep(3)
+            i += 1
 
-    response = b"" # opening buffer and reading until empty
+        print("Connected to WiFi\n")
+
+    def get_public_ip(self):
+        response = self.http_get("https://api.ipify.org/?format=json")
+        ip = json.loads(response)['ip']
+        print(f"Public IP: {ip}\n")
+        return ip
+
+    @staticmethod
+    def http_get(url):
+        _, _, host, path = url.split('/', 3)
+        addr = socket.getaddrinfo(host, 80)[0][-1]
+        s = socket.socket()
+        s.connect(addr)
+        s.send(bytes(f'GET /{path} HTTP/1.0\r\nHost: {host}\r\n\r\n', 'utf8'))
+
+        response = b""
+        while True:
+            chunk = s.recv(4096)
+            if len(chunk) == 0:
+                break
+            response += chunk
+        s.close()
+
+        return response.decode('ascii').split("\r\n\r\n")[-1]
+
+class Sensor():
+    def read(self):
+        pass
+
+class TemperatureSensor(Sensor):
+    def __init__(self, pin):
+        self.temp_sensor = DS18X20(OneWire(Pin(pin)))
+        self.roms = self.temp_sensor.scan()
+
+    def read(self):
+        self.temp_sensor.convert_temp()
+        time.sleep(1)
+        temperatures = []
+        for rom in self.roms:
+            temp_f = self.temp_sensor.read_temp(rom) * (9/5) + 32 # C to F
+            temperatures.append(temp_f)
+        return temperatures
+
+class TurbiditySensor(Sensor):
+    def __init__(self, pin):
+        self.turbidity_sensor = ADC(Pin(pin))
+        # self.turbidity_sensor.atten(ADC.ATTN_11DB)  # Uncomment if needed
+
+    def read(self):
+        return self.turbidity_sensor.read()
+
+def main():
+    wifi = WiFiConnection(config.SSID, config.PASS)
+    wifi.connect()
+    wifi.get_public_ip()
+
+    temp_sensor = TemperatureSensor(pin=23)
+    turb_sensor = TurbiditySensor(pin=36)
+
+    for i in range(10):
+        print(f"Starting sensor reading in {10-i} seconds")
+        time.sleep(1)
+
     while True:
-        chunk = s.recv(4096)
-        if len(chunk) == 0:
-            break
-        response = response + chunk;
-    s.close()
+        temperatures = temp_sensor.read()
+        turbidity = turb_sensor.read()
+        
+        for temp in temperatures:
+            print(f"Temperature (*F): {temp}")
+        print(f"Turbidity: {turbidity}")
+        print()
+        
+        time.sleep(1)
 
-    return response.decode('ascii').split("\r\n\r\n")[-1]
-
-# print(http_get("https://api.ipify.org/?format=json"))
-print("Public IP:", json.loads(http_get("https://api.ipify.org/?format=json"))['ip'])
-print()
-
-for i in range(10):
-    print(f"Starting sensor reading in {10-i} seconds")
-    time.sleep(1)
-
-# --- SENSOR DATA ---
-
-#DS18B20 data line connected to pin P10
-temp_ow = OneWire(Pin(23))
-temp = DS18X20(temp_ow)
-roms = temp.scan()
-
-# Turbidity
-turb = ADC(Pin(36)) # max (clear) 4095
-#turb.atten(ADC.ATTN_11DB)
-
-temp.convert_temp()
-while True:
-    time.sleep(1)
-    for rom in roms:
-        print(f"Temperature (*F): {temp.read_temp(rom) * (9/5) + 32}")
-
-    print(f"Turbidity: {turb.read()}")
-
-    print()
-    temp.convert_temp()
+if __name__ == "__main__":
+    main()

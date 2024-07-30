@@ -1,7 +1,7 @@
 # Water Quality IoT
 
 ### AWS
-Make an `/auth` folder with the IoT thing's private key (`pem.key`) and device certificate (`pem.crt`).
+Make an `/auth` folder with the IoT thing's private key (`private.pem.key`) and device certificate (`cert.pem.crt`).
 
 ### Sensors
 1. DS18x20 Temperature Sensor - [Driver](https://github.com/robert-hh/Onewire_DS18X20)
