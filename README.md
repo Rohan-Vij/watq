@@ -1,7 +1,9 @@
 # Water Quality IoT
 
 ### AWS
+Create and fill out a `config.py` based on the example file.
 Make an `/auth` folder with the IoT thing's private key (`private.pem.key`) and device certificate (`cert.pem.crt`).
+Use the MQTT MicroPython library from [this](https://github.com/micropython/micropython-lib/blob/803452a1acd2a567ae1c2063e82b7128b5a702b4/micropython/umqtt.simple/umqtt/simple.py) commit where it still had normal SSL.
 
 ### Sensors
 1. DS18x20 Temperature Sensor - [Driver](https://github.com/robert-hh/Onewire_DS18X20)
