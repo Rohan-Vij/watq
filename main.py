@@ -3,6 +3,7 @@ import os
 import ujson
 import network
 from machine import Pin, ADC
+import array
 import socket
 import json
 from temp_sensor import DS18X20
@@ -103,8 +104,56 @@ class PhSensor(Sensor):
         self.ph_sensor = ADC(Pin(pin))
 
     def read(self):
-        voltage = self.ph_sensor.read() * (1 / 1388)  # scaling factor
+        voltage = self.ph_sensor.read() * (5 / 1023)  # scaling factor
+        return self.ph_sensor.read()
+
+class TDSSensor(Sensor):
+    def __init__(self, pin):
+        self.tds_sensor = ADC(Pin(pin))
+    
+    def read(self):
+        voltage = self.tds_sensor.read()
         return voltage
+
+
+# class TDSSensor(Sensor):
+#     VREF = 3.3  # Reference voltage of the ADC
+#     SCOUNT = 30  # Number of samples
+
+#     def __init__(self, pin):
+#         self.tds_sensor = ADC(Pin(pin))
+#         self.analog_buffer = array.array('i', [0] * self.SCOUNT)
+#         self.analog_buffer_index = 0
+#         self.temperature = 25  # Default temperature in Celsius
+
+#     def read(self):
+#         analog_sample_timepoint = time.ticks_ms()
+#         if time.ticks_diff(time.ticks_ms(), analog_sample_timepoint) > 40:  # Every 40 milliseconds
+#             analog_sample_timepoint = time.ticks_ms()
+#             self.analog_buffer[self.analog_buffer_index] = self.tds_sensor.read()
+#             self.analog_buffer_index += 1
+#             if self.analog_buffer_index == self.SCOUNT:
+#                 self.analog_buffer_index = 0
+
+#         print_timepoint = time.ticks_ms()
+#         if time.ticks_diff(time.ticks_ms(), print_timepoint) > 800:  # Every 800 milliseconds
+#             print_timepoint = time.ticks_ms()
+#             analog_buffer_temp = array.array('i', self.analog_buffer)
+#             average_voltage = self.get_median_num(analog_buffer_temp, self.SCOUNT) * (self.VREF / 4095.0)
+#             compensation_coefficient = 1.0 + 0.02 * (self.temperature - 25.0)
+#             compensation_voltage = average_voltage / compensation_coefficient
+#             tds_value = (133.42 * compensation_voltage**3 - 255.86 * compensation_voltage**2 + 857.39 * compensation_voltage) * 0.5
+#             # print("TDS Value: {:.0f} ppm".format(tds_value))
+#             return tds_value
+
+#     def get_median_num(self, buffer, count):
+#         sorted_buffer = sorted(buffer)
+#         if count % 2 == 0:
+#             median = (sorted_buffer[count // 2 - 1] + sorted_buffer[count // 2]) / 2
+#         else:
+#             median = sorted_buffer[count // 2]
+#         return median
+        
 
 class MQTTHandler:
     def __init__(self, client_id, endpoint, key_path, cert_path, thing_name, temp_sensor, turbidity_sensor, ph_sensor, led_pin=2):
@@ -163,6 +212,7 @@ class MQTTHandler:
             temperatures = self.temp_sensor.read()
             turbidity = self.turbidity_sensor.read()
             ph = self.ph_sensor.read()
+            tds = self.tds_sensor.read()
 
             mesg = ujson.dumps({
                 "state": {
@@ -176,6 +226,7 @@ class MQTTHandler:
                         "sensors": {
                             "temperature": temperatures[0],
                             "turbidity": turbidity,
+                            "tds": tds,
                             "ph": ph
                         },
                         "led": {
@@ -200,24 +251,31 @@ def main():
 
     temp_sensor = TemperatureSensor(pin=23)
     turbidity_sensor = TurbiditySensor(pin=36)
-    ph_sensor = PhSensor(pin=39)
+    ph_sensor = PhSensor(pin=33)
+    tds_sensor = TDSSensor(pin=34)
 
-    # while True:
-    #     print(temp_sensor.read(), turbidity_sensor.read(), ph_sensor.read())
+    while True:
+        # print(temp_sensor.read(), turbidity_sensor.read(), ph_sensor.read(), tds_sensor.read())
+        print("Temp:", temp_sensor.read()[0])
+        print("Turbidity:", turbidity_sensor.read())
+        print("PH:", ph_sensor.read())
+        print("TDS:", tds_sensor.read())
+        print()
+        time.sleep(1)
 
-    mqtt_handler = MQTTHandler(
-        client_id="WatqClient",
-        endpoint=config.AWS_ENDPOINT,
-        key_path="/auth/private.pem.key",
-        cert_path="/auth/cert.pem.crt",
-        thing_name="WatqThing",
-        temp_sensor=temp_sensor,
-        turbidity_sensor=turbidity_sensor,
-        ph_sensor=ph_sensor
-    )
+    # mqtt_handler = MQTTHandler(
+    #     client_id="WatqClient",
+    #     endpoint=config.AWS_ENDPOINT,
+    #     key_path="/auth/private.pem.key",
+    #     cert_path="/auth/cert.pem.crt",
+    #     thing_name="WatqThing",
+    #     temp_sensor=temp_sensor,
+    #     turbidity_sensor=turbidity_sensor,
+    #     ph_sensor=ph_sensor
+    # )
 
-    mqtt_handler.connect()
-    mqtt_handler.run()
+    # mqtt_handler.connect()
+    # mqtt_handler.run()
 
 if __name__ == "__main__":
     main()
